@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const UserService = require('../../services/user_service');
 const apiRes = require('../../utils/api_response');
+const auth = require('../../middlewares/auth');
 
 router.get('/', async (req, res, next) => {
   (async () => {
@@ -22,11 +23,13 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', (req, res, next) => {
   (async () => {
-    const { firstName, lastName, age } = req.body;
-    const user = await UserService.addNewUser(firstName, lastName, age);
-    return {
-      user,
-    };
+    const { username, password, name } = req.body;
+    const result = await UserService.addNewUser({
+      username,
+      password,
+      name,
+    });
+    return result;
   })()
     .then((r) => {
       res.data = r;
@@ -54,7 +57,7 @@ router.get('/:userId', (req, res, next) => {
     });
 });
 
-router.post('/:userId/subscription', (req, res, next) => {
+router.post('/:userId/subscription', auth(), (req, res, next) => {
   (async () => {
     const { userId } = req.params;
     const sub = UserService.createSubscription(
