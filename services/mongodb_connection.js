@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 const logger = require('../utils/loggers/app_logger');
+const mongoSetting = require('../setting').mongo;
 
 mongoose.Promise = Promise;
 
-const uri = 'mongodb://localhost:27017/what_i_love';
+const { uri } = mongoSetting;
 mongoose.connect(uri, { useMongoClient: true });
 const db = mongoose.connection;
 
