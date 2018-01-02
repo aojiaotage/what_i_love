@@ -64,3 +64,4 @@ typings/
 # cipher stuff, never commit it to a public repo
 .cipher
 
+setting.js
