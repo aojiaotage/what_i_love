@@ -1,14 +1,12 @@
 const express = require('express');
+const userRouter = require('./user');
+const adminRouter = require('./admin');
+const UserService = require('../../services/user_service');
+const apiRes = require('../../utils/api_response');
 
 const router = express.Router();
 
-const userRouter = require('./user');
-
-const UserService = require('../../services/user_service');
-
-const apiRes = require('../../utils/api_response');
-
-router.post('/login', (req, res) => {
+router.post('/login', (req, res, next) => {
   (async () => {
     const { username, password } = req.body;
     const result = await UserService.loginWithNamePass(username, password);
@@ -19,11 +17,12 @@ router.post('/login', (req, res) => {
       apiRes(req, res);
     })
     .catch((e) => {
-      res.err = e;
-      apiRes(req, res);
+      next(e);
     });
 });
 
 router.use('/user', userRouter);
+
+router.use('/admin', adminRouter);
 
 module.exports = router;
