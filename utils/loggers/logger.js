@@ -3,7 +3,7 @@ const winston = require('winston');
 require('winston-daily-rotate-file');
 
 const { Logger, transports } = winston;
-const { DailyRotateFile } = transports;
+const { DailyRotateFile, Console } = transports;
 
 const logger = new Logger({
   transports: [
@@ -23,5 +23,11 @@ const logger = new Logger({
     }),
   ],
 });
+
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(Console, {
+    format: (info) => `${info.timestamp} [${info.label}] ${info.level}: ${info.message}`,
+  });
+}
 
 module.exports = logger;

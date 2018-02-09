@@ -4,6 +4,7 @@ const HTTPReqParamError = require(
 const HTTPBaseError = require('../errors/http_errors/http_base_error');
 const logger = require('../utils/loggers/logger');
 const Content = require('../models/mongoose/content');
+const ESService = require('../services/es_service');
 const axios = require('axios');
 
 /**
@@ -174,16 +175,18 @@ async function startFetchingProcess(spider) {
           spiderServiceContentId: c.contentId,
           contentType: c.contentType,
           content: c.content,
-          tags: c.content.tags,
+          tags: c.tags,
           title: c.title,
         };
       });
-      await Content.model.insertMany(wrappedContent);
+      const insertedList = await Content.model.insertMany(wrappedContent);
       latestId = wrappedContent[wrappedContent.length -
       1].spiderServiceContentId;
       if (wrappedContent.length < pageSizeLimit) {
         clearInterval(intervalId);
       }
+
+      ESService.createOrUpdateContents(insertedList);
     })()
       .catch((e) => {
         logger.error(
@@ -209,7 +212,7 @@ async function fetchingLists(url, latestId, pageSize) {
       if (!res.data || !res.data.contentList) {
         throw new Error('invalid response from spider service');
       }
-      return contentList;
+      return res.data.contentList;
     })
     .catch((e) => {
       logger.error('error fetching content from spider', {
