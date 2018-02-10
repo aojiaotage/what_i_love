@@ -166,46 +166,88 @@ async function startFetchingProcess(spider) {
 
   const actualPeriodMills = Math.ceil(1000 / frequencyLimit) * 2;
 
-  const intervalId = setInterval(() => {
-    (async () => {
-      const list = await fetchingLists(url, latestId, pageSizeLimit);
-      const wrappedContent = list.map((c) => {
-        return {
-          spiderServiceId: spider._id,
-          spiderServiceContentId: c.contentId,
-          contentType: c.contentType,
-          content: c.content,
-          tags: c.tags,
-          title: c.title,
-        };
-      });
-      const insertedList = await Content.model.insertMany(wrappedContent);
-      latestId = wrappedContent[wrappedContent.length -
-      1].spiderServiceContentId;
-      if (wrappedContent.length < pageSizeLimit) {
-        clearInterval(intervalId);
-      }
+  async function fetch(startTime, lastId) {
+    const list = await fetchingLists(url, lastId, pageSizeLimit);
+    const upsertPromises = [];
+    const wrappedContent = list.map((c) => {
+      const wrapped = {
+        spiderServiceId: spider._id,
+        spiderServiceContentId: c.contentId,
+        contentType: c.contentType,
+        content: c.content,
+        tags: c.tags,
+        title: c.title,
+      };
 
-      ESService.createOrUpdateContents(insertedList);
-    })()
+      upsertPromises.push(Content.model.findOneAndUpdate(
+        { spiderServiceContentId: c.contentId },
+        wrapped,
+        {
+          upsert: true,
+          new: true,
+        },
+      ));
+      return wrapped;
+    });
+
+    const insertedOrUpdatedList = await Promise.all(upsertPromises)
       .catch((e) => {
         logger.error(
-          'error fetching list data from spider service',
-          {
-            errMsg: e.message,
-            errStack: e.stack,
-          },
+          'error inserting spider service content to db',
+          { err: e },
         );
       });
-  }, actualPeriodMills);
+
+    latestId = wrappedContent[wrappedContent.length -
+    1].spiderServiceContentId;
+
+    if (wrappedContent.length < pageSizeLimit) {
+      return;
+    }
+
+    ESService.createOrUpdateContents(insertedOrUpdatedList);
+
+    const endTime = Date.now().valueOf();
+    const timePassed = endTime - startTime;
+
+    const timeout = timePassed - actualPeriodMills < 0 ? actualPeriodMills -
+      timePassed : 0;
+
+    setTimeout(() => {
+      fetch(endTime, latestId)
+        .catch((e) => {
+          logger.error(
+            'error fetching list data from spider service',
+            {
+              errMsg: e.message,
+              errStack: e.stack,
+            },
+          );
+        });
+    }, timeout);
+  }
+
+  fetch()
+    .catch((e) => {
+      logger.error(
+        'error fetching list data from spider service',
+        {
+          errMsg: e.message,
+          errStack: e.stack,
+        },
+      );
+    });
 }
 
 async function fetchingLists(url, latestId, pageSize) {
+
   const contentList = await axios.get(
     url,
     {
-      latestId,
-      pageSize,
+      params: {
+        latestId,
+        pageSize,
+      },
     },
   )
     .then((res) => {
